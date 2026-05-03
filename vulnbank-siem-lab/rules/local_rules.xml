@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ┌─────────────────────────────────────────────────────┐
+  │  VulnBank SIEM Lab — Custom Wazuh Detection Rules   │
+  │  File: /var/ossec/etc/rules/local_rules.xml         │
+  │                                                     │
+  │  Rule IDs: 100001–100010 (local range)              │
+  │  Last updated: 2026                                 │
+  └─────────────────────────────────────────────────────┘
+
+  TUNING NOTE:
+  Rule 100004 (failed login) uses a JSON field match on "status".
+  After deployment, verify VulnBank's actual login response format:
+    docker logs <container-id> | grep -i "failed\|invalid"
+  Adjust the <field> pattern to match what you see.
+-->
+
+<group name="local,vulnbank,web_attacks,">
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!--  SQL INJECTION                                          -->
+  <!--  Detects common SQL injection strings in web requests  -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <rule id="100001" level="10">
+    <decoded_as>web-accesslog</decoded_as>
+    <regex>(%27|%22|\bOR\b|\bAND\b|\bSELECT\b|\bUNION\b|\bDROP\b|\bINSERT\b|\bUPDATE\b)</regex>
+    <description>SQL injection attempt detected in web request</description>
+    <group>attack,sql_injection,pci_dss_6.5.1,gdpr_IV_35.7.d,</group>
+    <mitre>
+      <id>T1190</id>  <!-- Exploit Public-Facing Application -->
+    </mitre>
+  </rule>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!--  CROSS-SITE SCRIPTING (XSS)                             -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <rule id="100002" level="10">
+    <decoded_as>web-accesslog</decoded_as>
+    <regex>(&lt;script|javascript:|onerror=|onload=|alert\(|document\.cookie)</regex>
+    <description>XSS (Cross-Site Scripting) payload detected in web request</description>
+    <group>attack,xss,pci_dss_6.5.7,</group>
+    <mitre>
+      <id>T1059.007</id>  <!-- JavaScript injection -->
+    </mitre>
+  </rule>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!--  FAILED LOGIN (base rule — counted by brute force rule) -->
+  <!--                                                         -->
+  <!--  ⚠ TUNING REQUIRED:                                     -->
+  <!--  Check VulnBank's JSON response format and update       -->
+  <!--  the <field> value to match its actual "failed" key     -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <rule id="100004" level="3">
+    <decoded_as>json</decoded_as>
+    <field name="status">failed|error|invalid|unauthorized</field>
+    <description>VulnBank: single failed authentication attempt</description>
+    <group>authentication_failed,</group>
+  </rule>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!--  BRUTE FORCE                                            -->
+  <!--  Triggers when 10+ rule-100004 alerts come from        -->
+  <!--  the same IP within a 2-minute window                  -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <rule id="100003" level="10" frequency="10" timeframe="120">
+    <if_matched_sid>100004</if_matched_sid>
+    <same_source_ip />
+    <description>Brute force attack: 10+ failed logins in 2 minutes from same IP</description>
+    <group>attack,brute_force,authentication_failures,pci_dss_11.4,</group>
+    <mitre>
+      <id>T1110</id>  <!-- Brute Force -->
+    </mitre>
+  </rule>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!--  DIRECTORY / PATH TRAVERSAL                             -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <rule id="100005" level="10">
+    <decoded_as>web-accesslog</decoded_as>
+    <regex>(\.\.\/|\.\.\\|%2e%2e%2f|%252e%252e%252f|\.\.%2f)</regex>
+    <description>Directory traversal attempt detected in web request</description>
+    <group>attack,path_traversal,pci_dss_6.5.8,</group>
+    <mitre>
+      <id>T1083</id>  <!-- File and Directory Discovery -->
+    </mitre>
+  </rule>
+
+</group>
