@@ -1,0 +1,23 @@
+# Sensitive files — never commit these
+wazuh_admin_password.txt
+*.password
+*.secret
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# Screenshots placeholder — commit real ones when available
+screenshots/*.placeholder
